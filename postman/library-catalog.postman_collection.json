@@ -1,0 +1,127 @@
+{
+  "info": {
+    "_postman_id": "e76b57bf-2813-4ca1-884f-39b442c90e6f",
+    "name": "Library Catalog Service",
+    "description": "Genre and book REST API requests. Create a genre before creating a book; the collection stores created IDs in collection variables.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "genreId", "value": "" },
+    { "key": "bookId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "List genres",
+      "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/genres" },
+      "response": []
+    },
+    {
+      "name": "Create genre",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["if (pm.response.code === 201) pm.collectionVariables.set('genreId', pm.response.json()._id);"] } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"name\": \"Postman Genre\",\n  \"slug\": \"postman-genre\"\n}", "options": { "raw": { "language": "json" } } },
+        "url": "{{baseUrl}}/genres"
+      },
+      "response": []
+    },
+    {
+      "name": "Get genre by ID",
+      "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/genres/{{genreId}}" },
+      "response": []
+    },
+    {
+      "name": "Update genre",
+      "request": {
+        "method": "PUT",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"name\": \"Postman Genre Updated\"\n}", "options": { "raw": { "language": "json" } } },
+        "url": "{{baseUrl}}/genres/{{genreId}}"
+      },
+      "response": []
+    },
+    {
+      "name": "List books (combined filters and pagination)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/books?genre={{genreId}}&search=clockwork&page=1&limit=5",
+          "host": ["{{baseUrl}}"],
+          "path": ["books"],
+          "query": [
+            { "key": "genre", "value": "{{genreId}}" },
+            { "key": "search", "value": "clockwork" },
+            { "key": "page", "value": "1" },
+            { "key": "limit", "value": "5" }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Create book",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["if (pm.response.code === 201) pm.collectionVariables.set('bookId', pm.response.json()._id);"] } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"title\": \"Postman Sample Book\",\n  \"author\": \"A. Reader\",\n  \"isbn\": \"9781234567897\",\n  \"description\": \"A sample book created from the Postman collection.\",\n  \"coverImage\": \"https://example.com/cover.jpg\",\n  \"totalCopies\": 5,\n  \"availableCopies\": 4,\n  \"genre\": \"{{genreId}}\"\n}", "options": { "raw": { "language": "json" } } },
+        "url": "{{baseUrl}}/books"
+      },
+      "response": []
+    },
+    {
+      "name": "Get book by ID",
+      "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/books/{{bookId}}" },
+      "response": []
+    },
+    {
+      "name": "Update book",
+      "request": {
+        "method": "PUT",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{\n  \"availableCopies\": 3\n}", "options": { "raw": { "language": "json" } } },
+        "url": "{{baseUrl}}/books/{{bookId}}"
+      },
+      "response": []
+    },
+    {
+      "name": "Delete book",
+      "request": { "method": "DELETE", "header": [], "url": "{{baseUrl}}/books/{{bookId}}" },
+      "response": []
+    },
+    {
+      "name": "Invalid book create (400 validation example)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": { "mode": "raw", "raw": "{}", "options": { "raw": { "language": "json" } } },
+        "url": "{{baseUrl}}/books"
+      },
+      "response": [
+        {
+          "name": "400 Bad Request — required fields missing",
+          "originalRequest": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/books"
+          },
+          "status": "Bad Request",
+          "code": 400,
+          "_postman_previewlanguage": "json",
+          "header": [{ "key": "Content-Type", "value": "application/json; charset=utf-8" }],
+          "cookie": [],
+          "body": "{\n  \"error\": \"Validation failed.\",\n  \"details\": {\n    \"title\": \"This field is required.\",\n    \"author\": \"This field is required.\",\n    \"isbn\": \"This field is required.\",\n    \"description\": \"This field is required.\",\n    \"coverImage\": \"This field is required.\",\n    \"totalCopies\": \"This field is required.\",\n    \"availableCopies\": \"This field is required.\",\n    \"genre\": \"This field is required.\"\n  }\n}"
+        }
+      ]
+    },
+    {
+      "name": "Delete genre",
+      "request": { "method": "DELETE", "header": [], "url": "{{baseUrl}}/genres/{{genreId}}" },
+      "response": []
+    }
+  ]
+}

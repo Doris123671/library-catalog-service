@@ -16,6 +16,38 @@ A small MongoDB/Mongoose data layer for a library catalog. It defines separate `
 
 The seed script deletes existing books and genres in the connected database before inserting the catalog. Re-running it is safe with respect to duplicate data, but it is destructive to any other documents in those two collections. Use a dedicated development database. The script validates copy counts and generates valid ISBN-13 check digits for its unique 12-digit prefixes.
 
+## REST API
+
+Start the API with `npm start` after configuring `MONGODB_URI`. The server listens on port `3000` by default; set `PORT` to override it. Routes are mounted at the root (there is no `/api` prefix), and request/response bodies use JSON.
+
+| Method | Endpoint | Behavior |
+| --- | --- | --- |
+| `GET` | `/genres` | List genres, sorted by name. |
+| `GET` | `/genres/:id` | Get one genre (`404` if it does not exist). |
+| `POST` | `/genres` | Create a genre; requires non-empty `name` and lowercase kebab-case `slug` (`201`). |
+| `PUT` | `/genres/:id` | Update one or more supplied genre fields (`200`). |
+| `DELETE` | `/genres/:id` | Delete an unused genre (`204`); returns `409` when books still reference it. |
+| `GET` | `/books` | List books, with optional filters and pagination described below. |
+| `GET` | `/books/:id` | Get one book with its populated genre (`404` if absent). |
+| `POST` | `/books` | Create a book (`201`). |
+| `PUT` | `/books/:id` | Update one or more supplied book fields (`200`). |
+| `DELETE` | `/books/:id` | Delete a book (`204`). |
+
+Book create requests require `title`, `author`, `isbn`, `description`, `coverImage`, `totalCopies`, `availableCopies`, and `genre`. Counts must be non-negative integers, available copies cannot exceed total copies, `coverImage` must be an HTTP(S) URL, and `genre` must identify an existing genre. Genre create requests require both fields. Updates accept partial payloads but must include at least one field. Unknown fields are rejected.
+
+`GET /books` supports these query parameters (they can be combined):
+
+- `genre=<genreId>` filters by the genre ObjectId.
+- `search=<text>` performs a case-insensitive substring match against title or author.
+- `page=<positive integer>` selects a 1-based page (default `1`).
+- `limit=<positive integer>` sets page size (default `10`, maximum `100`).
+
+For example, `/books?genre=<genreId>&search=clockwork&page=1&limit=5` combines all filters. The response contains `data` and `pagination` (`page`, `limit`, `total`, and `pages`). Invalid input returns `400` JSON with a `details` object keyed by the failing field; unexpected server errors return a generic JSON message without a stack trace.
+
+### Postman
+
+Import [`postman/library-catalog.postman_collection.json`](postman/library-catalog.postman_collection.json) into Postman. The collection uses `baseUrl`, `genreId`, and `bookId` variables and includes requests for every endpoint, a combined book-filter example, and a saved `400` example for an empty book-create payload.
+
 ## Schema Design
 
 ### Genre
