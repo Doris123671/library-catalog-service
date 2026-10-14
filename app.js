@@ -3,11 +3,15 @@ require('dotenv').config();
 const express = require('express');
 const genresRouter = require('./routes/genres');
 const booksRouter = require('./routes/books');
+const authRouter = require('./routes/auth');
+const usersRouter = require('./routes/users');
 
 const app = express();
 
 app.disable('x-powered-by');
 app.use(express.json({ limit: '100kb' }));
+app.use('/api/auth', authRouter);
+app.use('/api/users', usersRouter);
 app.use('/genres', genresRouter);
 app.use('/books', booksRouter);
 

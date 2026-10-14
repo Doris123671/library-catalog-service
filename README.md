@@ -10,18 +10,24 @@ A small MongoDB/Mongoose data layer for a library catalog. It defines separate `
 ## Setup and seed
 
 1. From this directory, install dependencies with `npm install`.
-2. Copy `.env.example` to `.env` and replace its placeholder with your MongoDB connection string. For Atlas, create a database user, allow your client IP in Network Access, and keep the URI private.
-3. Run `npm run seed`.
-4. In Atlas Data Explorer, open the database named in the URI and verify that `genres` has 4 documents and `books` has 15. The books' `genre` values are ObjectIds; use **Expand** or populate them in an application to inspect the corresponding genre.
+2. Copy `.env.example` to `.env`, set `MONGODB_URI`, and replace `AUTH_TOKEN_SECRET` with a random value of at least 32 characters. For example, generate one with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`. For Atlas, create a database user, allow your client IP in Network Access, and keep both values private.
+3. Run `npm run seed` to load the sample catalog, then `npm run seed:user` to create the test librarian account.
+4. In Atlas Data Explorer, open the database named in the URI and verify that `genres` has 4 documents, `books` has 15, and `users` has one librarian. The books' `genre` values are ObjectIds; use **Expand** or populate them in an application to inspect the corresponding genre.
 
 The seed script deletes existing books and genres in the connected database before inserting the catalog. Re-running it is safe with respect to duplicate data, but it is destructive to any other documents in those two collections. Use a dedicated development database. The script validates copy counts and generates valid ISBN-13 check digits for its unique 12-digit prefixes.
 
+The user seed is separate and repeatable. It creates or resets `librarian@example.com` (username `librarian`) with the test password `LibraryCatalog!2026`; it also demotes any other librarian accounts so exactly one librarian remains. This is a development/test credential—change it before deploying anywhere public.
+
 ## REST API
 
-Start the API with `npm start` after configuring `MONGODB_URI`. The server listens on port `3000` by default; set `PORT` to override it. Routes are mounted at the root (there is no `/api` prefix), and request/response bodies use JSON.
+Start the API with `npm start` after configuring `MONGODB_URI`. The server listens on port `3000` by default; set `PORT` to override it. Catalog routes are mounted at the root; authentication and user routes use the `/api` prefix. Request/response bodies use JSON.
 
 | Method | Endpoint | Behavior |
 | --- | --- | --- |
+| `POST` | `/api/auth/register` | Create a patron account from `username`, `email`, and `password` (`201`). The client cannot choose a role. |
+| `POST` | `/api/auth/login` | Verify a username or email and password; on success, set the `library_auth` authentication cookie (`200`). |
+| `POST` | `/api/auth/logout` | Clear the authentication cookie (`200`). |
+| `GET` | `/api/users/profile` | Return the authenticated caller's own profile. Requires authentication. |
 | `GET` | `/genres` | List genres, sorted by name. |
 | `GET` | `/genres/:id` | Get one genre (`404` if it does not exist). |
 | `POST` | `/genres` | Create a genre; requires non-empty `name` and lowercase kebab-case `slug` (`201`). |
@@ -29,11 +35,19 @@ Start the API with `npm start` after configuring `MONGODB_URI`. The server liste
 | `DELETE` | `/genres/:id` | Delete an unused genre (`204`); returns `409` when books still reference it. |
 | `GET` | `/books` | List books, with optional filters and pagination described below. |
 | `GET` | `/books/:id` | Get one book with its populated genre (`404` if absent). |
-| `POST` | `/books` | Create a book (`201`). |
-| `PUT` | `/books/:id` | Update one or more supplied book fields (`200`). |
-| `DELETE` | `/books/:id` | Delete a book (`204`). |
+| `POST` | `/books` | Create a book (`201`). Requires a librarian. |
+| `PUT` | `/books/:id` | Update one or more supplied book fields (`200`). Requires a librarian. |
+| `DELETE` | `/books/:id` | Delete a book (`204`). Requires a librarian. |
 
 Book create requests require `title`, `author`, `isbn`, `description`, `coverImage`, `totalCopies`, `availableCopies`, and `genre`. Counts must be non-negative integers, available copies cannot exceed total copies, `coverImage` must be an HTTP(S) URL, and `genre` must identify an existing genre. Genre create requests require both fields. Updates accept partial payloads but must include at least one field. Unknown fields are rejected.
+
+Registration accepts usernames of 3–30 letters, digits, or underscores (stored lowercase), email addresses, and passwords of at least 8 characters. Passwords are hashed with bcrypt before they are stored; the password hash is excluded from normal user queries and JSON responses. New accounts always have the `patron` role. Requests without a valid token receive `401`; authenticated patrons attempting book mutations receive `403`. Login accepts `{ "identifier": "username-or-email", "password": "..." }` (or a `username` or `email` field instead of `identifier`). The JWT is sent only in an HttpOnly cookie, never in the login response body. The API also accepts an `Authorization: Bearer <token>` header for non-browser clients.
+
+### Token Storage and logout
+
+The browser stores the JWT in the `library_auth` cookie, which is marked `HttpOnly`, `SameSite=Strict`, and `Secure` in production. I chose this over `localStorage` because JavaScript cannot read an HttpOnly cookie, reducing the chance that an XSS bug can steal the credential; a localStorage token is easier for JavaScript clients to attach but is exposed to injected scripts. `SameSite=Strict` also helps prevent cross-site request forgery (CSRF). Cookies are attached automatically to requests, however, so this approach is less convenient than explicitly adding a bearer token, and cookie-based authentication still needs deliberate CSRF protection if the application later permits cross-site requests or relaxes its `SameSite` policy. Keep the API and browser app same-site, retain `SameSite=Strict`, and add CSRF tokens and Origin checks before enabling cross-site cookie use.
+
+Tokens expire after one hour. Logout clears the browser cookie, but JWTs are stateless: clearing it does not revoke a copied token on the server, and such a token remains usable until expiry. For that reason, clients using the optional bearer-header mode must discard their own token on logout. Immediate server-side revocation would require a token blocklist or server-managed sessions; neither is used here. This keeps the service simple and avoids a database lookup for session state, at the cost of delaying revocation until expiration. The cookie is the recommended storage for browser clients.
 
 `GET /books` supports these query parameters (they can be combined):
 
